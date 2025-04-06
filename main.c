@@ -111,10 +111,10 @@ void drawAppHeader() {
 }
 
 void drawNetworkDetailsAtBottom(int selectedOption) {
-    int y = SCREEN_HEIGHT - TEXT_HEIGHT - 2; // Posição do texto na parte inferior
+    int y = SCREEN_HEIGHT - TEXT_HEIGHT - 1; // Posição do texto na parte inferior
     char details[64];
 
-    drawClearRectangle(0, y, SCREEN_WIDTH, TEXT_HEIGHT); // Limpa a área do texto
+    drawClearRectangle(0, y, SCREEN_WIDTH, SCREEN_HEIGHT); // Limpa a área do texto
     drawLine(0, y, SCREEN_WIDTH, y); // Linha horizontal
 
     uint8_t thisAuthMode = networks[selectedOption].auth_mode; // Modo de autenticação da rede selecionada
