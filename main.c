@@ -39,6 +39,29 @@ wifi_network_t networks[MAX_RESULTS];
 // Contador de redes encontradas
 int network_count = 0;                  
 
+int rssiToBars(int rssi) {
+    if (rssi >= -50) return 5; // Excelente sinal
+    if (rssi >= -60) return 4; // Bom sinal
+    if (rssi >= -70) return 3; // Sinal razoável
+    if (rssi >= -80) return 2; // Sinal fraco
+    return 1; // Sem sinal
+}
+
+void drawSignalBars(int x, int y, int bars) {
+    int barWidth = 2;
+    int barSpacing = 1;
+    int barHeightUnit = 2;
+
+    for (int i = 0; i < 4; i++) {
+        int height = (i < bars) ? (i + 1) * barHeightUnit : 0;
+        if (height > 0) {
+            int barX = x + i * (barWidth + barSpacing);
+            int barY = y + (TEXT_HEIGHT - height);
+            drawRectangle(barX, barY, barWidth, height);
+        }
+    }
+}
+
 // Função chamada automaticamente sempre que um resultado de varredura
 // é encontrado. O resultado é passado como argumento (result).
 static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
@@ -104,9 +127,11 @@ void showNetworksOnDisplay()
         snprintf(rssi, sizeof(rssi), "(%ddBm)", networks[i].rssi);
         drawText(0, y, ssid);
         
-        int _rssi_x = SCREEN_WIDTH - 50; // Posição do RSSI
-        drawClearRectangle(_rssi_x, y, 50, TEXT_HEIGHT); // Limpa a área do RSSI
-        drawText(_rssi_x, y, rssi);
+        int _rssi_x = SCREEN_WIDTH - 20; // Posição do RSSI
+        drawClearRectangle(_rssi_x - 2, y, 50, TEXT_HEIGHT); // Limpa a área do RSSI
+        
+        int bars = rssiToBars(networks[i].rssi);
+        drawSignalBars(_rssi_x, y, bars);
 
         y += 8;
         if (y >= SCREEN_HEIGHT) break;
@@ -119,6 +144,9 @@ int compareByRSSI(const void *a, const void *b) {
     const wifi_network_t *networkB = (const wifi_network_t *)b;
     return networkB->rssi - networkA->rssi; // Ordena em ordem decrescente de RSSI
 }
+
+
+
 
 int main()
 {

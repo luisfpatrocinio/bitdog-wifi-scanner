@@ -33,3 +33,8 @@ void drawClearRectangle(int x, int y, int width, int height)
 {
     ssd1306_clear_square(&display, x, y, width, height);
 }
+
+void drawRectangle(int x, int y, int width, int height)
+{
+    ssd1306_draw_square(&display, x, y, width, height);
+}

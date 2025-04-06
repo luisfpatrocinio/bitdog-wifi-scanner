@@ -24,5 +24,6 @@ void drawImage(const uint8_t *data, const long size, int x, int y);
 void drawLine(int x1, int y1, int x2, int y2);
 
 void drawClearRectangle(int x, int y, int width, int height);
+void drawRectangle(int x, int y, int width, int height);
 
 #endif // DRAW_H
