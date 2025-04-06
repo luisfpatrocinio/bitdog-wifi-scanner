@@ -15,25 +15,47 @@ const uint LED_PIN_RED = 13;
 #define MAX_RESULTS 5
 
 typedef struct {
-    char ssid[33]; // SSID da rede Wi-Fi (32 caracteres + terminador nulo)
-    int rssi; // Intensidade do sinal (RSSI)
+    char ssid[33];      // SSID da rede Wi-Fi (32 caracteres + terminador nulo)
+    uint8_t bssid[6];   // Endereço MAC da rede (BSSID)
+    int rssi;           // Intensidade do sinal (RSSI)
 } wifi_network_t;
 
-wifi_network_t networks[MAX_RESULTS]; // Array para armazenar os resultados da varredura
-int network_count = 0; // Contador de redes encontradas
+wifi_network_t networks[MAX_RESULTS];   // Array para armazenar os resultados da varredura
+int network_count = 0;                  // Contador de redes encontradas
 
 // Função chamada automaticamente sempre que um resultado de varredura
 // é encontrado. O resultado é passado como argumento (result).
 static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
 {
-    printf("SSID: %s, RSSI: %d\n", result->ssid, result->rssi);
-    if (result && network_count < MAX_RESULTS)
+    // Pular redes com SSID vazio ou nulo
+    if (!result || strlen((const char*)result->ssid) == 0)
+        return 0; 
+
+    // Verifica se o BSSID já está na lista
+    for (int i = 0; i < network_count; i++)
     {
+        // Compara o BSSID da rede atual com os já encontrados
+        if (memcmp(networks[i].bssid, result->bssid, sizeof(networks[i].bssid)) == 0)
+        {
+            // Atualiza o RSSI se já estiver na lista
+            networks[i].rssi = result->rssi; 
+            return 0;
+        }
+    }
+
+    if (network_count < MAX_RESULTS)
+    {
+        // Copia o SSID da rede encontrada para a estrutura
         strncpy(networks[network_count].ssid, (const char*)result->ssid, 32);
         networks[network_count].ssid[32] = '\0'; // Garante que a string esteja terminada
-        networks[network_count].rssi = result->rssi; // Armazena a intensidade do sinal
+
+        // Copia o BSSID da rede encontrada para a estrutura
+        memcpy(networks[network_count].bssid, result->bssid, sizeof(networks[network_count].bssid)); 
+
+        // Armazena a intensidade do sinal (RSSI) da rede encontrada
+        networks[network_count].rssi = result->rssi; 
+
         network_count++; // Incrementa o contador de redes encontradas
-        printf("Rede encontrada: %s (RSSI: %d)\n", networks[network_count - 1].ssid, networks[network_count - 1].rssi);
     }
     return 0; // Retorna 0 para continuar a varredura.
 }
