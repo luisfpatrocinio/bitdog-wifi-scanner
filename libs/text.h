@@ -8,6 +8,9 @@
  #ifndef TEXT_H
  #define TEXT_H
  
+ #define TEXT_HEIGHT 8 // Height of the text in pixels
+ #define TEXT_WIDTH 6  // Width of the text in pixels
+ 
  #include "display.h"
  #include <math.h>
  

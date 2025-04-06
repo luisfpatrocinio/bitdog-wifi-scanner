@@ -12,22 +12,54 @@
 
 const uint LED_PIN_RED = 13;
 
+#define MAX_RESULTS 5
+
+typedef struct {
+    char ssid[33]; // SSID da rede Wi-Fi (32 caracteres + terminador nulo)
+    int rssi; // Intensidade do sinal (RSSI)
+} wifi_network_t;
+
+wifi_network_t networks[MAX_RESULTS]; // Array para armazenar os resultados da varredura
+int network_count = 0; // Contador de redes encontradas
+
 // Função chamada automaticamente sempre que um resultado de varredura
 // é encontrado. O resultado é passado como argumento (result).
 static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
 {
-    if (result)
+    printf("SSID: %s, RSSI: %d\n", result->ssid, result->rssi);
+    if (result && network_count < MAX_RESULTS)
     {
-        // Printa as informações do resultado da varredura.
-        printf("SSID: %-32s RSSI: %4d CHAN: %3d MAC: %02x:%02x:%02x:%02x:%02x:%02x, SEC: %u\n",
-               result->ssid,
-               result->rssi,
-               result->channel,
-               result->bssid[0], result->bssid[1], result->bssid[2],
-               result->bssid[3], result->bssid[4], result->bssid[5],
-               result->auth_mode);
+        strncpy(networks[network_count].ssid, (const char*)result->ssid, 32);
+        networks[network_count].ssid[32] = '\0'; // Garante que a string esteja terminada
+        networks[network_count].rssi = result->rssi; // Armazena a intensidade do sinal
+        network_count++; // Incrementa o contador de redes encontradas
+        printf("Rede encontrada: %s (RSSI: %d)\n", networks[network_count - 1].ssid, networks[network_count - 1].rssi);
     }
     return 0; // Retorna 0 para continuar a varredura.
+}
+
+void showNetworksOnDisplay() 
+{
+    clearDisplay(); 
+    int y = 0; // Posição vertical
+    drawTextCentered("Patro Wi-fi Scanner", y);
+    y += TEXT_HEIGHT; 
+
+    // Header:
+    char header[64];
+    snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
+    drawTextCentered(header, y);
+
+    for (int i = 0; i < network_count; i++)
+    {
+        char line[64];
+        snprintf(line, sizeof(line), "%s (%ddBm)", networks[i].ssid, networks[i].rssi);
+        y += 8;
+        drawText(0, y, line);
+        printf(line);
+        if (y >= SCREEN_HEIGHT) break;
+    }
+    showDisplay();
 }
 
 int main()
@@ -74,10 +106,11 @@ int main()
 
                 // Inicia a varredura wi-fi utilizando as opções configuradas.
                 int err = cyw43_wifi_scan(&cyw43_state, &scanOptions, NULL, scanResult);
-
+                
                 if (err == 0)
                 {
                     printf("Iniciando varredura...\n");
+                    network_count = 0; // Limpa os dados antigos
                     scanning = true;
                 }
                 else
@@ -89,6 +122,7 @@ int main()
             else if (!cyw43_wifi_scan_active(&cyw43_state))
             {
                 printf("Varredura concluída\n");
+                showNetworksOnDisplay();
                 scanTime = make_timeout_time_ms(NEW_SCAN_TIMER_MS);
                 scanning = false;
             }
