@@ -1,27 +1,40 @@
+// Standard libraries
 #include <stdio.h>
+
+// Pico SDK libraries
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
+// Hardware-specific libraries
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
 
+// Custom libraries
 #include "libs/display.h"
 #include "libs/text.h"
+#include "libs/draw.h"
 
-#define NEW_SCAN_TIMER_MS 5000 // Tempo de espera entre as varreduras (10 segundos)
+// Tempo de espera entre as varreduras (10 segundos)
+#define NEW_SCAN_TIMER_MS 5000 
 
+// Pino do LED vermelho
 const uint LED_PIN_RED = 13;
 
+// Definições de hardware para o display I2C
 #define MAX_RESULTS 5
 
+// Estrutura para armazenar informações de redes Wi-Fi
 typedef struct {
-    char ssid[33];      // SSID da rede Wi-Fi (32 caracteres + terminador nulo)
+    char ssid[33];      // SSID da rede Wi-Fi (32 caracteres + '\0')
     uint8_t bssid[6];   // Endereço MAC da rede (BSSID)
     int rssi;           // Intensidade do sinal (RSSI)
 } wifi_network_t;
 
-wifi_network_t networks[MAX_RESULTS];   // Array para armazenar os resultados da varredura
-int network_count = 0;                  // Contador de redes encontradas
+// Array para armazenar os resultados da varredura
+wifi_network_t networks[MAX_RESULTS];   
+
+// Contador de redes encontradas
+int network_count = 0;                  
 
 // Função chamada automaticamente sempre que um resultado de varredura
 // é encontrado. O resultado é passado como argumento (result).
@@ -60,10 +73,16 @@ static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
     return 0; // Retorna 0 para continuar a varredura.
 }
 
+/**
+ * @brief Função para exibir as redes Wi-Fi encontradas no display.
+ *        Limpa o display antes de exibir os resultados.
+ */
 void showNetworksOnDisplay() 
 {
     clearDisplay(); 
-    int y = 0; // Posição vertical
+
+    // Título:
+    int y = 0; 
     drawTextCentered("Patro Wi-fi Scanner", y);
     y += TEXT_HEIGHT; 
 
@@ -71,14 +90,22 @@ void showNetworksOnDisplay()
     char header[64];
     snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
     drawTextCentered(header, y);
-
+    drawLine(0, 16, SCREEN_WIDTH, 16);
+    
+    y= 18;
     for (int i = 0; i < network_count; i++)
     {
-        char line[64];
-        snprintf(line, sizeof(line), "%s (%ddBm)", networks[i].ssid, networks[i].rssi);
+        char ssid[33];
+        char rssi[16];
+        snprintf(ssid, sizeof(ssid), "%s", networks[i].ssid);
+        snprintf(rssi, sizeof(rssi), "(%ddBm)", networks[i].rssi);
+        drawText(0, y, ssid);
+        
+        int _rssi_x = SCREEN_WIDTH - 50; // Posição do RSSI
+        drawClearRectangle(_rssi_x, y, 50, TEXT_HEIGHT); // Limpa a área do RSSI
+        drawText(_rssi_x, y, rssi);
+
         y += 8;
-        drawText(0, y, line);
-        printf(line);
         if (y >= SCREEN_HEIGHT) break;
     }
     showDisplay();
