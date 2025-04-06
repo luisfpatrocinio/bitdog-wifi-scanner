@@ -64,6 +64,7 @@ target_include_directories(wifi_comm PRIVATE
 target_link_libraries(wifi_comm 
         pico_cyw43_arch_none
         hardware_i2c
+        hardware_adc
         )
 
 pico_add_extra_outputs(wifi_comm)

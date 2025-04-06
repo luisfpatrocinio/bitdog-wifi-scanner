@@ -1,6 +1,7 @@
 // Standard libraries
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 // Pico SDK libraries
 #include "pico/stdlib.h"
@@ -11,55 +12,47 @@
 #include "hardware/clocks.h"
 
 // Custom libraries
-#include "libs/display.h"
-#include "libs/text.h"
-#include "libs/draw.h"
-
-
+#include "display.h"
+#include "text.h"
+#include "draw.h"
+#include "patro_wifi_scanner.h"
+#include "analog.h"
 
 // Tempo de espera entre as varreduras (10 segundos)
-#define NEW_SCAN_TIMER_MS 500 
+#define NEW_SCAN_TIMER_MS 10000 
+#define MAX_RESULTS 5
 
 // Pino do LED vermelho
 const uint LED_PIN_RED = 13;
-
-// Definições de hardware para o display I2C
-#define MAX_RESULTS 5
 
 // Estrutura para armazenar informações de redes Wi-Fi
 typedef struct {
     char ssid[33];      // SSID da rede Wi-Fi (32 caracteres + '\0')
     uint8_t bssid[6];   // Endereço MAC da rede (BSSID)
     int rssi;           // Intensidade do sinal (RSSI)
+    uint8_t auth_mode;  // Modo de autenticação (WPA, WPA2, etc.)
+    
 } wifi_network_t;
 
 // Array para armazenar os resultados da varredura
 wifi_network_t networks[MAX_RESULTS];   
 
 // Contador de redes encontradas
-int network_count = 0;                  
+int network_count = 0;
 
+// Opção selecionada no menu
+int selectedOption = 0; 
+// Cooldown para evitar múltiplas leituras rápidas
+int inputCooldown = 0; 
+int scrollY = 0; // Posição de rolagem do menu
+
+// Função para converter RSSI em barras de sinal (1 a 5)
 int rssiToBars(int rssi) {
     if (rssi >= -50) return 5; // Excelente sinal
     if (rssi >= -60) return 4; // Bom sinal
     if (rssi >= -70) return 3; // Sinal razoável
     if (rssi >= -80) return 2; // Sinal fraco
     return 1; // Sem sinal
-}
-
-void drawSignalBars(int x, int y, int bars) {
-    int barWidth = 2;
-    int barSpacing = 1;
-    int barHeightUnit = 2;
-
-    for (int i = 0; i < 4; i++) {
-        int height = (i < bars) ? (i + 1) * barHeightUnit : 0;
-        if (height > 0) {
-            int barX = x + i * (barWidth + barSpacing);
-            int barY = y + (TEXT_HEIGHT - height);
-            drawRectangle(barX, barY, barWidth, height);
-        }
-    }
 }
 
 // Função chamada automaticamente sempre que um resultado de varredura
@@ -94,18 +87,16 @@ static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
         // Armazena a intensidade do sinal (RSSI) da rede encontrada
         networks[network_count].rssi = result->rssi; 
 
+        // Armazena o modo de autenticação da rede encontrada
+        networks[network_count].auth_mode = result->auth_mode;
+
         network_count++; // Incrementa o contador de redes encontradas
     }
     return 0; // Retorna 0 para continuar a varredura.
 }
 
-/**
- * @brief Função para exibir as redes Wi-Fi encontradas no display.
- *        Limpa o display antes de exibir os resultados.
- */
-void showNetworksOnDisplay() 
-{
-    clearDisplay(); 
+void drawAppHeader() {
+    drawClearRectangle(0, 0, SCREEN_WIDTH, 16); // Limpa a área do cabeçalho
 
     // Título:
     int y = 0; 
@@ -117,25 +108,71 @@ void showNetworksOnDisplay()
     snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
     drawTextCentered(header, y);
     drawLine(0, 16, SCREEN_WIDTH, 16);
-    
-    y= 18;
+}
+
+void drawNetworkDetailsAtBottom(int selectedOption) {
+    int y = SCREEN_HEIGHT - TEXT_HEIGHT - 2; // Posição do texto na parte inferior
+    char details[64];
+
+    drawClearRectangle(0, y, SCREEN_WIDTH, TEXT_HEIGHT); // Limpa a área do texto
+    drawLine(0, y, SCREEN_WIDTH, y); // Linha horizontal
+
+    uint8_t thisAuthMode = networks[selectedOption].auth_mode; // Modo de autenticação da rede selecionada
+    snprintf(details, sizeof(details), "Modo: %s",
+                thisAuthMode == CYW43_AUTH_OPEN ? "Aberta" :
+                thisAuthMode == CYW43_AUTH_WPA2_AES_PSK ? "WPA2 (AES)" :
+                thisAuthMode == CYW43_AUTH_WPA2_MIXED_PSK ? "WPA2 (Misto)" :
+                thisAuthMode == CYW43_AUTH_WPA3_SAE_AES_PSK ? "WPA3 (SAE AES)" :
+                thisAuthMode == CYW43_AUTH_WPA3_WPA2_AES_PSK ? "WPA3/WPA2 (AES)" :
+                thisAuthMode == CYW43_AUTH_WPA_TKIP_PSK ? "WPA (TKIP)" :
+                "Bloqueada");
+
+    drawText(0, y + 1, details); // Exibe o modo de autenticação da rede selecionada
+}
+
+/**
+ * @brief Função para exibir as redes Wi-Fi encontradas no display.
+ *        Limpa o display antes de exibir os resultados.
+ */
+void showNetworksOnDisplay() 
+{
+    clearDisplay(); 
+
+    int targetScrollY = MIN(selectedOption, network_count - 3)* 10; // Posição alvo para rolagem
+
+    scrollY = approach(scrollY, targetScrollY, 1); // Atualiza a posição de rolagem
+
+    int y = 22 - scrollY;
     for (int i = 0; i < network_count; i++)
     {
+        // Formata o SSID e RSSI para exibição
         char ssid[33];
         char rssi[16];
         snprintf(ssid, sizeof(ssid), "%s", networks[i].ssid);
         snprintf(rssi, sizeof(rssi), "(%ddBm)", networks[i].rssi);
-        drawText(0, y, ssid);
-        
+
+        // Desenha o nome da rede (SSID)
+        if (i == selectedOption) {
+            drawText(0, y, ">"); 
+            drawText(7, y, ssid); 
+        } else {
+            drawText(0, y, ssid); 
+        }        
+
+        // Desenhar o Sinal (RSSI)
         int _rssi_x = SCREEN_WIDTH - 20; // Posição do RSSI
         drawClearRectangle(_rssi_x - 2, y, 50, TEXT_HEIGHT); // Limpa a área do RSSI
         
         int bars = rssiToBars(networks[i].rssi);
         drawSignalBars(_rssi_x, y, bars);
 
-        y += 8;
+        y += 10;
         if (y >= SCREEN_HEIGHT) break;
     }
+
+    drawAppHeader(); // Desenha o cabeçalho
+    drawNetworkDetailsAtBottom(selectedOption); // Exibe detalhes da rede selecionada
+
     showDisplay();
 }
 
@@ -151,10 +188,11 @@ int compareByRSSI(const void *a, const void *b) {
 int main()
 {
     stdio_init_all(); // Inicializa a comunicação serial.
-    sleep_ms(1000);
+    sleep_ms(369);
     printf("* Patro Wi-fi Scanner - Embarcatech 2025\n");
     gpio_init(LED_PIN_RED);
     gpio_set_dir(LED_PIN_RED, GPIO_OUT);
+    initAnalog(); // Inicializa os pinos analógicos
 
     // Inicializar LED
     initI2C();
@@ -182,6 +220,26 @@ int main()
 
     while (true)
     {
+
+        // Obter input
+        updateAxis();
+        if (inputCooldown < 0) {
+            if (analog_y < 0)
+            {
+                selectedOption--;
+                inputCooldown = 10; 
+            }
+            else if (analog_y > 0)
+            {
+                selectedOption++;
+                inputCooldown = 10;
+            }
+            if (selectedOption < 0) selectedOption = 0;
+            if (selectedOption >= network_count) selectedOption = network_count - 1;
+        } else {
+            inputCooldown--;
+        }
+
         if (absolute_time_diff_us(get_absolute_time(), scanTime) < 0)
         {
             // Se nenhuma varredura estiver em andamento, inicia uma nova varredura.
@@ -212,21 +270,19 @@ int main()
                 // Ordena as redes encontradas por RSSI (intensidade do sinal)
                 qsort(networks, network_count, sizeof(wifi_network_t), compareByRSSI);
 
-                showNetworksOnDisplay();
                 scanTime = make_timeout_time_ms(NEW_SCAN_TIMER_MS);
                 scanning = false;
             }
         }
-        gpio_put(LED_PIN_RED, true);
-        sleep_ms(169);
-        gpio_put(LED_PIN_RED, false);
-        sleep_ms(169);
+
+        showNetworksOnDisplay();
 
 #if PICO_CYW43_ARCH_POLL
             cyw43_arch_poll();
             cyw43_arch_wait_for_work_until(scanTime);
 #else
-            sleep_ms(NEW_SCAN_TIMER_MS);
+            
+        // sleep_ms(NEW_SCAN_TIMER_MS);
 #endif
     }
         // Libera os recursos do wi-fi antes de encerrar o programa.
