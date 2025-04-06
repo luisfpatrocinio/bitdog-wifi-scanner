@@ -17,6 +17,7 @@
 #include "draw.h"
 #include "patro_wifi_scanner.h"
 #include "analog.h"
+#include "buttons.h"
 
 // Tempo de espera entre as varreduras (10 segundos)
 #define NEW_SCAN_TIMER_MS 10000 
@@ -37,13 +38,6 @@ typedef struct {
 // Array para armazenar os resultados da varredura
 wifi_network_t networks[MAX_RESULTS];   
 
-// Contador de redes encontradas
-int network_count = 0;
-
-// Opção selecionada no menu
-int selectedOption = 0; 
-// Cooldown para evitar múltiplas leituras rápidas
-int inputCooldown = 0; 
 int scrollY = 0; // Posição de rolagem do menu
 
 // Função para converter RSSI em barras de sinal (1 a 5)
@@ -93,21 +87,6 @@ static int scanResult(void *env, const cyw43_ev_scan_result_t *result)
         network_count++; // Incrementa o contador de redes encontradas
     }
     return 0; // Retorna 0 para continuar a varredura.
-}
-
-void drawAppHeader() {
-    drawClearRectangle(0, 0, SCREEN_WIDTH, 16); // Limpa a área do cabeçalho
-
-    // Título:
-    int y = 0; 
-    drawTextCentered("Patro Wi-fi Scanner", y);
-    y += TEXT_HEIGHT; 
-
-    // Header:
-    char header[64];
-    snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
-    drawTextCentered(header, y);
-    drawLine(0, 16, SCREEN_WIDTH, 16);
 }
 
 void drawNetworkDetailsAtBottom(int selectedOption) {
@@ -183,6 +162,26 @@ int compareByRSSI(const void *a, const void *b) {
 }
 
 
+void confirmButtonCallback(uint gpio, uint32_t events) {
+    if (gpio == BTA) {
+        
+    } else if (gpio == BTB) {
+        // Selecionar rede
+        if (network_count > 0 && selectedOption < network_count) {
+            // Conectar à rede selecionada
+            printf("Conectando à rede: %s\n", networks[selectedOption].ssid);
+            printf("Ainda não implementado.\n");
+            // int err = cyw43_arch_wifi_connect_timeout_ms(networks[selectedOption].ssid, NULL, networks[selectedOption].auth_mode, 10000);
+            // if (err == 0) {
+            //     printf("Conectado com sucesso!\n");
+            //     // Aqui você pode adicionar código para lidar com a conexão bem-sucedida
+            // } else {
+            //     printf("Falha ao conectar: %d\n", err);
+            //     // Aqui você pode adicionar código para lidar com a falha de conexão
+            // }
+        } 
+    }
+}
 
 
 int main()
@@ -190,9 +189,10 @@ int main()
     stdio_init_all(); // Inicializa a comunicação serial.
     sleep_ms(369);
     printf("* Patro Wi-fi Scanner - Embarcatech 2025\n");
-    gpio_init(LED_PIN_RED);
-    gpio_set_dir(LED_PIN_RED, GPIO_OUT);
+    
     initAnalog(); // Inicializa os pinos analógicos
+    initializeButtons(); // Inicializa os botões
+    setButtonCallback(confirmButtonCallback); // Configura o callback para os botões
 
     // Inicializar LED
     initI2C();
@@ -201,7 +201,7 @@ int main()
     drawTextCentered("Patro Wi-fi Scanner", SCREEN_HEIGHT / 2 - 8);
     showDisplay(); // Limpa o display
 
-    // Inicializar wi-fi
+    // Inicializar wi-fi  
     if (cyw43_arch_init())
     {
         printf("Falha ao inicializar o Wi-Fi\n");

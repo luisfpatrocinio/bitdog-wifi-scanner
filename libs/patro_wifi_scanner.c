@@ -1,5 +1,9 @@
 #include "patro_wifi_scanner.h"
 
+int selectedOption = 0;
+int network_count = 0;
+int inputCooldown = 0;
+
 // Função para desenhar barras de sinal no display
 void drawSignalBars(int x, int y, int bars) {
     int barWidth = 2;
@@ -14,4 +18,19 @@ void drawSignalBars(int x, int y, int bars) {
             drawRectangle(barX, barY, barWidth, height);
         }
     }
+}
+
+void drawAppHeader() {
+    drawClearRectangle(0, 0, SCREEN_WIDTH, 16); // Limpa a área do cabeçalho
+
+    // Título:
+    int y = 0; 
+    drawTextCentered("Patro Wi-fi Scanner", y);
+    y += TEXT_HEIGHT; 
+
+    // Header:
+    char header[64];
+    snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
+    drawTextCentered(header, y);
+    drawLine(0, 16, SCREEN_WIDTH, 16);
 }

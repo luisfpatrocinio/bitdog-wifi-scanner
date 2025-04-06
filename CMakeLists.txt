@@ -40,7 +40,10 @@ foreach(file ${LIBS})
 endforeach()
 
 # Add executable. Default name is the project name, version 0.1
-add_executable(wifi_comm main.c ${LIBS})
+add_executable(wifi_comm 
+main.c 
+${LIBS}
+)
 
 pico_set_program_name(wifi_comm "wifi_comm")
 pico_set_program_version(wifi_comm "0.1")
@@ -51,7 +54,8 @@ pico_enable_stdio_usb(wifi_comm 1)
 
 # Add the standard library to the build
 target_link_libraries(wifi_comm
-        pico_stdlib)
+        pico_stdlib
+        )
 
 # Add the standard include files to the build
 target_include_directories(wifi_comm PRIVATE
@@ -62,7 +66,7 @@ target_include_directories(wifi_comm PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(wifi_comm 
-        pico_cyw43_arch_none
+        pico_cyw43_arch_lwip_threadsafe_background
         hardware_i2c
         hardware_adc
         )
