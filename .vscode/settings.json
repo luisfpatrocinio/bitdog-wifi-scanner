@@ -45,6 +45,10 @@
         "format": "c",
         "istream": "c",
         "limits": "c",
-        "numeric": "c"
+        "numeric": "c",
+        "initialize.h": "c",
+        "cyw43_arch.h": "c",
+        "functional": "c",
+        "netif.h": "c"
     }
 }
