@@ -1,5 +1,6 @@
 // Standard libraries
 #include <stdio.h>
+#include <stdlib.h>
 
 // Pico SDK libraries
 #include "pico/stdlib.h"
@@ -14,8 +15,10 @@
 #include "libs/text.h"
 #include "libs/draw.h"
 
+
+
 // Tempo de espera entre as varreduras (10 segundos)
-#define NEW_SCAN_TIMER_MS 5000 
+#define NEW_SCAN_TIMER_MS 500 
 
 // Pino do LED vermelho
 const uint LED_PIN_RED = 13;
@@ -111,6 +114,12 @@ void showNetworksOnDisplay()
     showDisplay();
 }
 
+int compareByRSSI(const void *a, const void *b) {
+    const wifi_network_t *networkA = (const wifi_network_t *)a;
+    const wifi_network_t *networkB = (const wifi_network_t *)b;
+    return networkB->rssi - networkA->rssi; // Ordena em ordem decrescente de RSSI
+}
+
 int main()
 {
     stdio_init_all(); // Inicializa a comunicação serial.
@@ -171,6 +180,10 @@ int main()
             else if (!cyw43_wifi_scan_active(&cyw43_state))
             {
                 printf("Varredura concluída\n");
+
+                // Ordena as redes encontradas por RSSI (intensidade do sinal)
+                qsort(networks, network_count, sizeof(wifi_network_t), compareByRSSI);
+
                 showNetworksOnDisplay();
                 scanTime = make_timeout_time_ms(NEW_SCAN_TIMER_MS);
                 scanning = false;
