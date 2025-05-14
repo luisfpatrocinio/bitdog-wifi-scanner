@@ -30,7 +30,7 @@ void drawAppHeader() {
 
     // Header:
     char header[64];
-    snprintf(header, sizeof(header), "Redes encontradas (%d)", network_count);
+    snprintf(header, sizeof(header), "Networks found (%d)", network_count);
     drawTextCentered(header, y);
     drawLine(0, 16, SCREEN_WIDTH, 16);
 }

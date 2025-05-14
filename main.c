@@ -21,7 +21,9 @@
 
 // Tempo de espera entre as varreduras (10 segundos)
 #define NEW_SCAN_TIMER_MS 10000 
-#define MAX_RESULTS 5
+#define MAX_RESULTS 20
+
+#define DEG2RAD 0.0174532925
 
 // Pino do LED vermelho
 const uint LED_PIN_RED = 13;
@@ -31,7 +33,7 @@ typedef struct {
     char ssid[33];      // SSID da rede Wi-Fi (32 caracteres + '\0')
     uint8_t bssid[6];   // Endereço MAC da rede (BSSID)
     int rssi;           // Intensidade do sinal (RSSI)
-    uint8_t auth_mode;  // Modo de autenticação (WPA, WPA2, etc.)
+    uint64_t auth_mode;  // Modo de autenticação (WPA, WPA2, etc.)
     
 } wifi_network_t;
 
@@ -96,15 +98,30 @@ void drawNetworkDetailsAtBottom(int selectedOption) {
     drawClearRectangle(0, y, SCREEN_WIDTH, SCREEN_HEIGHT); // Limpa a área do texto
     drawLine(0, y, SCREEN_WIDTH, y); // Linha horizontal
 
-    uint8_t thisAuthMode = networks[selectedOption].auth_mode; // Modo de autenticação da rede selecionada
-    snprintf(details, sizeof(details), "Modo: %s",
-                thisAuthMode == CYW43_AUTH_OPEN ? "Aberta" :
+    uint64_t thisAuthMode = networks[selectedOption].auth_mode; // Modo de autenticação da rede selecionada
+    snprintf(details, sizeof(details), "Mode: %s",
+                thisAuthMode == CYW43_AUTH_OPEN ? "Open" :
                 thisAuthMode == CYW43_AUTH_WPA2_AES_PSK ? "WPA2 (AES)" :
                 thisAuthMode == CYW43_AUTH_WPA2_MIXED_PSK ? "WPA2 (Misto)" :
                 thisAuthMode == CYW43_AUTH_WPA3_SAE_AES_PSK ? "WPA3 (SAE AES)" :
                 thisAuthMode == CYW43_AUTH_WPA3_WPA2_AES_PSK ? "WPA3/WPA2 (AES)" :
                 thisAuthMode == CYW43_AUTH_WPA_TKIP_PSK ? "WPA (TKIP)" :
-                "Bloqueada");
+                "Locked");
+
+    if (thisAuthMode == CYW43_AUTH_WPA2_AES_PSK) {
+        printf("Rede: %s\n", networks[selectedOption].ssid); // Exibe o SSID da rede selecionada
+        printf("Modo de autenticação: WPA2 (AES)\n"); // Exibe o modo de autenticação no console
+    }
+
+    if (thisAuthMode == CYW43_AUTH_WPA2_MIXED_PSK) {
+        printf("Rede: %s\n", networks[selectedOption].ssid); // Exibe o SSID da rede selecionada
+        printf("Modo de autenticação: WPA2 (Misto)\n"); // Exibe o modo de autenticação no console
+    }
+
+    if (thisAuthMode == CYW43_AUTH_OPEN) {
+        printf("Rede: %s\n", networks[selectedOption].ssid); // Exibe o SSID da rede selecionada
+        printf("Modo de autenticação: Aberta\n"); // Exibe o modo de autenticação no console
+    }
 
     drawText(0, y + 1, details); // Exibe o modo de autenticação da rede selecionada
 }
@@ -115,6 +132,12 @@ void drawNetworkDetailsAtBottom(int selectedOption) {
  */
 void showNetworksOnDisplay() 
 {
+    static int _timer = 0;
+    _timer += 4;
+    if (_timer > 360) {
+        _timer -= 360;
+    }
+
     clearDisplay(); 
 
     int targetScrollY = MIN(selectedOption, network_count - 3)* 10; // Posição alvo para rolagem
@@ -132,8 +155,9 @@ void showNetworksOnDisplay()
 
         // Desenha o nome da rede (SSID)
         if (i == selectedOption) {
-            drawText(0, y, ">"); 
-            drawText(7, y, ssid); 
+            int _x = 2 + sin(_timer * DEG2RAD) * 2; // Animação de destaque
+            drawText(_x, y, ">"); 
+            drawText(8, y, ssid); 
         } else {
             drawText(0, y, ssid); 
         }        
@@ -171,14 +195,14 @@ void confirmButtonCallback(uint gpio, uint32_t events) {
             // Conectar à rede selecionada
             printf("Conectando à rede: %s\n", networks[selectedOption].ssid);
             printf("Ainda não implementado.\n");
-            // int err = cyw43_arch_wifi_connect_timeout_ms(networks[selectedOption].ssid, NULL, networks[selectedOption].auth_mode, 10000);
-            // if (err == 0) {
-            //     printf("Conectado com sucesso!\n");
-            //     // Aqui você pode adicionar código para lidar com a conexão bem-sucedida
-            // } else {
-            //     printf("Falha ao conectar: %d\n", err);
-            //     // Aqui você pode adicionar código para lidar com a falha de conexão
-            // }
+            int err = cyw43_arch_wifi_connect_timeout_ms(networks[selectedOption].ssid, NULL, networks[selectedOption].auth_mode, 10000);
+            if (err == 0) {
+                printf("Conectado com sucesso!\n");
+                // Aqui você pode adicionar código para lidar com a conexão bem-sucedida
+            } else {
+                printf("Falha ao conectar: %d\n", err);
+                // Aqui você pode adicionar código para lidar com a falha de conexão
+            }
         } 
     }
 }
@@ -266,6 +290,10 @@ int main()
             else if (!cyw43_wifi_scan_active(&cyw43_state))
             {
                 printf("Varredura concluída\n");
+                
+                // Reiniciar
+                selectedOption = 0; // Reinicia a seleção
+                scrollY = 0; // Reinicia a rolagem
 
                 // Ordena as redes encontradas por RSSI (intensidade do sinal)
                 qsort(networks, network_count, sizeof(wifi_network_t), compareByRSSI);
